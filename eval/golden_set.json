@@ -1,0 +1,18 @@
+[
+  {
+    "question": "What were Apple's total net sales in FY2025?",
+    "ground_truth": "Refer to the Consolidated Statements of Operations in the 10-K."
+  },
+  {
+    "question": "What are the main risk factors mentioned?",
+    "ground_truth": "Risk factors are listed in Item 1A of the 10-K."
+  },
+  {
+    "question": "How did the Services segment perform?",
+    "ground_truth": "Services segment net sales and performance are discussed in the MD&A section."
+  },
+  {
+    "question": "What is the stock price today?",
+    "ground_truth": "This information is not contained in the 10-K filing."
+  }
+]

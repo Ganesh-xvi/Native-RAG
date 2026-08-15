@@ -1,0 +1,203 @@
+{
+  "info": {
+    "_postman_id": "rag-api-collection",
+    "name": "RAG API",
+    "description": "RAG pipeline API — use with **Local** or **Docker** Postman environment.\n\n## Setup\n1. Import this collection\n2. Import `local.postman_environment.json` or `docker.postman_environment.json`\n3. Select the environment in Postman\n4. Set `apiKey` to match `API_KEY` in your `.env`\n\n## Flow\n1. Health → 2. Ingest (upload PDF) → 3. Task Status (poll) → 4. Query",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "apiKey", "value": "your-secret-api-key-here" },
+    { "key": "taskId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Liveness check — no API key required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ingest",
+      "item": [
+        {
+          "name": "POST /ingest (upload PDF)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const body = pm.response.json();",
+                  "    pm.environment.set('taskId', body.task_id);",
+                  "    pm.collectionVariables.set('taskId', body.task_id);",
+                  "    pm.test('Task ID saved', () => pm.expect(body.task_id).to.be.a('string'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{apiKey}}", "type": "text" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select a PDF file (e.g. data/Apple's FY2025 10-K Annual Report.pdf)"
+                },
+                {
+                  "key": "recreate",
+                  "value": "false",
+                  "type": "text",
+                  "description": "true = replace index; false = append"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/ingest",
+            "description": "Upload PDF — returns task_id (202). Poll GET /tasks/{task_id}."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /tasks/{task_id}",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-API-Key", "value": "{{apiKey}}", "type": "text" }
+            ],
+            "url": "{{baseUrl}}/tasks/{{taskId}}",
+            "description": "Poll ingest/rebuild job status. Uses taskId from ingest response."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /index/rebuild",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 202) {",
+                  "    const body = pm.response.json();",
+                  "    pm.environment.set('taskId', body.task_id);",
+                  "    pm.collectionVariables.set('taskId', body.task_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{apiKey}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clear_uploads\": false\n}"
+            },
+            "url": "{{baseUrl}}/index/rebuild",
+            "description": "Re-embed all PDFs in data/ directory."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Query",
+      "item": [
+        {
+          "name": "POST /query",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{apiKey}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"What were Apple's total net sales in FY2025?\",\n  \"top_k\": 4\n}"
+            },
+            "url": "{{baseUrl}}/query",
+            "description": "Ask a question — returns answer + sources + guardrail info."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /query/stream",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{apiKey}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" },
+              { "key": "Accept", "value": "text/event-stream", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"What are Apple's main risk factors?\",\n  \"top_k\": 4\n}"
+            },
+            "url": "{{baseUrl}}/query/stream",
+            "description": "Streaming SSE response — tokens arrive as data: {\"token\": \"...\"} events."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Eval",
+      "item": [
+        {
+          "name": "POST /eval (default golden set)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{apiKey}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/eval",
+            "description": "Run RAG eval metrics on eval/golden_set.json."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /eval (custom questions)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-API-Key", "value": "{{apiKey}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questions\": [\n    {\n      \"question\": \"What were Apple's total net sales in FY2025?\",\n      \"ground_truth\": \"Refer to Consolidated Statements of Operations.\"\n    }\n  ],\n  \"metrics\": [\"faithfulness\", \"answer_relevancy\", \"context_precision\"]\n}"
+            },
+            "url": "{{baseUrl}}/eval",
+            "description": "Run eval with custom Q&A pairs and metrics."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
